@@ -21,16 +21,30 @@ It avoids publishing:
 
 ## Sensitive Areas Identified In The Codebase
 
-### Configuration files under `utils/`
+### Configuration files and Kubernetes Secrets
 
-The backend appears to depend on local JSON configuration files that may contain:
+The backend depends on JSON configuration files (`utils/`) that may contain:
 
 - database credentials
 - external-service credentials
 - JWT signing secrets
 - internal hostnames and paths
 
+On Kubernetes these files are provided by the Secret `secrets-config`. The Secret manifest in the repository currently carries real values: it must not be committed or published, and the values should be rotated if it has been shared. Prefer creating the Secret from files (`kubectl create secret generic ... --from-file`) or a secret manager, and generate a strong random `jwt_key`.
+
 These files should never be published as-is.
+
+### Hard-coded credentials in source code
+
+The `GET /nextclaud_cred` route in `WebServices.py` returns WebDAV credentials that are written directly in the source. Remove the route and move the credentials to the Secret before any code is shared.
+
+### Logs
+
+Logs are shipped to Loki and visible to everyone with Grafana access. Do not log tokens, passwords or full query strings (the JWT travels in the `authorization` query parameter, so full request URLs in access logs contain it). Protect Grafana with a strong admin password stored in a Secret (not in the manifest), and avoid exposing its NodePort outside the internal network.
+
+### Cluster exposure
+
+NodePorts are open for the backend (30010), PostgreSQL (30005), Grafana (30030) and the registry (30500). Restrict them with firewall rules or switch the Services to `ClusterIP` behind the Ingress.
 
 ## High-Risk Behaviors To Note
 
@@ -53,6 +67,10 @@ Required action before code publication:
 - remove the endpoint entirely, or
 - restrict it behind strong authentication and redesign the workflow
 
+Known route currently matching this risk profile:
+
+- `GET /nextclaud_cred`
+
 ### Query-string token transport
 
 Protected routes currently rely on a token passed as a query parameter.
@@ -64,6 +82,14 @@ Operational risk:
 Recommended replacement:
 
 - `Authorization: Bearer <token>` header transport
+
+### Federated login exposure
+
+SAML endpoints are part of the authentication surface and should be reviewed before publication for:
+
+- redirect URI leakage
+- tenant/domain details in logs and screenshots
+- callback error payload disclosure
 
 ### Internal network coupling
 
@@ -101,7 +127,7 @@ Do not include:
 - `documents/` samples unless sanitized
 - generated PDFs or exports
 - database dumps
-- internal deployment files
+- internal deployment files (Kubernetes manifests with Secrets, registry addresses, hostPaths)
 - virtual environments
 
 ## Suggested Disclaimer Text

@@ -1,11 +1,16 @@
 # Bollettino CFD Backend Documentation
 
 ![Docs only](https://img.shields.io/badge/repository-documentation--only-0a7ea4)
-![Backend](https://img.shields.io/badge/backend-Flask%20%2B%20Socket.IO-3c7d3e)
+![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20WebSocket-3c7d3e)
+![Runtime](https://img.shields.io/badge/runtime-Docker%20%2B%20Kubernetes-326ce5)
 ![Domain](https://img.shields.io/badge/domain-weather%20%26%20multi--risk%20bulletins-b85c00)
 ![Status](https://img.shields.io/badge/status-public--safe%20docs-ready)
 
-Standalone documentation for a Flask-based backend used to manage weather and multi-risk operational bulletins.
+Standalone documentation for a FastAPI-based backend used to manage weather and multi-risk operational bulletins. The backend is packaged as a Docker image and runs on Kubernetes (K3s) together with PostgreSQL, Redis and the scheduled import CronJobs.
+
+Last aligned with codebase routes, startup flow and Kubernetes manifests: 2026-11-04.
+
+Cluster-level documentation (deploy procedure, kubectl commands, logging stack) lives in the repository-root `docs/` folder. See [setup-and-operations.md](setup-and-operations.md) for the backend-specific view.
 
 This repository is designed for public sharing of architecture and API knowledge without publishing source code, credentials, or internal infrastructure details.
 
@@ -34,17 +39,21 @@ The backend supports:
 - authentication and authorization
 - weather and CFD bulletin editing workflows
 - multi-risk alert-level computation
-- real-time collaboration via Socket.IO events
+- real-time collaboration via native WebSocket rooms, fanned out across replicas with Redis Pub/Sub
 - PDF bulletin generation and file outputs
-- scheduled and on-demand external data imports
+- on-demand CFD infographic asset generation, triggered headlessly via Playwright against an external generator app
+- scheduled and on-demand external data imports (in-process APScheduler jobs and Kubernetes CronJobs)
+- structured console logging collected centrally (stdout, Fluent Bit, Loki, Grafana)
 
 Core stack:
 
-- Python
-- Flask
-- Flask-SocketIO
+- Python 3.11
+- FastAPI served by uvicorn
 - PostgreSQL
+- Redis (WebSocket Pub/Sub between replicas)
 - APScheduler
+- Docker image, deployed on Kubernetes (K3s) with Traefik ingress
+- Fluent Bit, Loki and Grafana for logs
 
 ## Documentation Index
 
@@ -52,8 +61,9 @@ Start here based on your goal:
 
 - Understand the system design: [architecture.md](architecture.md)
 - See visual architecture and flow maps: [diagrams.md](diagrams.md)
-- Run or operate it internally: [setup-and-operations.md](setup-and-operations.md)
+- Run or operate it (Docker, Kubernetes, logging): [setup-and-operations.md](setup-and-operations.md)
 - Explore the route surface quickly: [api-overview.md](api-overview.md)
+- See SQL trigger error code mappings (BLCxx and BLIxx): [api-overview.md](api-overview.md#sql-trigger-error-codes)
 - Prepare safe publication of code/assets: [security-and-publication-notes.md](security-and-publication-notes.md)
 
 ## Suggested Reading Paths
@@ -86,12 +96,13 @@ Suggested repository name options:
 
 Suggested short description:
 
-`Public-safe technical documentation for a Flask and Socket.IO backend that manages weather and multi-risk operational bulletins.`
+`Public-safe technical documentation for a FastAPI and WebSocket backend, running on Docker and Kubernetes, that manages weather and multi-risk operational bulletins.`
 
 Suggested topics:
 
-- `flask`
-- `socketio`
+- `fastapi`
+- `websocket`
+- `kubernetes`
 - `postgresql`
 - `backend`
 - `weather`
@@ -102,8 +113,9 @@ Suggested topics:
 
 - This repository is descriptive and implementation-aligned, not a formal specification.
 - Terminology reflects the production domain, including Italian route and field naming.
-- Configuration in the original codebase appears JSON-file based and environment-specific.
+- Configuration is JSON-file based (`utils/*.json`); on Kubernetes these files are injected from a Secret, a few settings can be overridden by environment variables (`LOGGING_LEVEL`, `LOG_OUTPUT`).
 - Security-sensitive implementation details are intentionally abstracted.
+- Some legacy or internal-only endpoints are documented for completeness and marked accordingly.
 
 ## Reuse Notice
 
